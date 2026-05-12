@@ -92,7 +92,6 @@ namespace wfaLayoutConverter
             trayMenu.Items.Add(toggleItem);
             trayIcon = new NotifyIcon();
             trayIcon.Text = "Layout Converter";
-            trayIcon.Icon = SystemIcons.Application; 
             trayIcon.ContextMenuStrip = trayMenu;
             trayIcon.Visible = true;
             this.ShowInTaskbar = false;
@@ -225,17 +224,16 @@ namespace wfaLayoutConverter
         private void AddToStartup(bool enable)
         {
             const string appName = "LayoutConverter";
-            string exePath = Application.ExecutablePath;
+
+            string exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName;
 
             using RegistryKey? key = Registry.CurrentUser.OpenSubKey(
-                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
-                writable: true);
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", writable: true);
 
             if (key == null) return;
 
-            if (enable) key.SetValue(appName, exePath);
-            else
-                key.DeleteValue(appName, false);
+            if (enable) key.SetValue(appName, $"\"{exePath}\"");
+            else key.DeleteValue(appName, false);
         }
     }
 }
