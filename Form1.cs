@@ -11,13 +11,63 @@ namespace wfaLayoutConverter
         [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
         [DllImport("user32.dll")] private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr LoadKeyboardLayout(string pwszKLID, uint Flags);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr ActivateKeyboardLayout(IntPtr hkl, uint Flags);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct GUITHREADINFO
+        {
+            public int cbSize;
+            public uint flags;
+            public IntPtr hwndActive;
+            public IntPtr hwndFocus;
+            public IntPtr hwndCapture;
+            public IntPtr hwndMenuOwner;
+            public IntPtr hwndMoveSize;
+            public IntPtr hwndCaret;
+            public RECT rcCaret;
+        }
+
+        private const uint KLF_ACTIVATE = 0x00000001;
+
+        private const uint WM_INPUTLANGCHANGEREQUEST = 0x0050;
+
+        private static readonly IntPtr RussianLayout =
+            LoadKeyboardLayout("00000419", KLF_ACTIVATE);
+
+        private static readonly IntPtr EnglishLayout =
+            LoadKeyboardLayout("00000409", KLF_ACTIVATE);
+
         private NotifyIcon trayIcon;
         private ContextMenuStrip trayMenu;
 
         private const int HOTKEY_ID = 1;
-        private const uint MOD_CONTROL = 0x0002;
         private const uint MOD_ALT = 0x0001;
-        private const uint VK_V = 0x56;
+        private const uint VK_Q = 0x51;
         private const int WM_HOTKEY = 0x0312;
         private const uint KEYDOWN = 0x0000;
         private const uint KEYUP = 0x0002;
@@ -78,12 +128,11 @@ namespace wfaLayoutConverter
 
         public Form1()
         {
-
             InitializeComponent();
 
             trayMenu = new ContextMenuStrip();
 
-            trayMenu.Items.Add("Hotkey: Ctrl + Alt + V");
+            trayMenu.Items.Add("Hotkey: Alt + Q");
 
             toggleItem = new ToolStripMenuItem("Enabled");
             toggleItem.Checked = isEnabled;
@@ -91,6 +140,8 @@ namespace wfaLayoutConverter
             toggleItem.Click += ToggleEnabled;
             trayMenu.Items.Add(toggleItem);
             trayIcon = new NotifyIcon();
+            //trayIcon.Icon = SystemIcons.Application;
+            trayIcon.Icon = new Icon("favicon.ico");
             trayIcon.Text = "Layout Converter";
             trayIcon.ContextMenuStrip = trayMenu;
             trayIcon.Visible = true;
@@ -98,7 +149,7 @@ namespace wfaLayoutConverter
             this.WindowState = FormWindowState.Minimized;
             this.Hide();
 
-            RegisterHotKey(this.Handle, HOTKEY_ID, MOD_CONTROL | MOD_ALT, VK_V);
+            RegisterHotKey(this.Handle, HOTKEY_ID, MOD_ALT, VK_Q);
             AddToStartup(true);
         }
 
@@ -108,7 +159,7 @@ namespace wfaLayoutConverter
 
             if (isEnabled)
             {
-                RegisterHotKey(this.Handle, HOTKEY_ID, MOD_CONTROL | MOD_ALT, VK_V);
+                RegisterHotKey(this.Handle, HOTKEY_ID, MOD_ALT, VK_Q);
                 AddToStartup(true);
 
                 toggleItem.Text = "Enabled";
@@ -168,7 +219,9 @@ namespace wfaLayoutConverter
             }
 
             string original = Clipboard.GetText();
-            string converted = ConvertLayout(original);
+
+            bool toRussian = DetectDirection(original);
+            string converted = ConvertLayout(original, toRussian);
 
             if (converted == original)
             {
@@ -185,7 +238,33 @@ namespace wfaLayoutConverter
             keybd_event(KEY_CTRL, 0, KEYUP, UIntPtr.Zero);
 
             await Task.Delay(150);
+
+            SetKeyboardLayout(toRussian);
+
             RestoreClipboard(saved);
+        }
+
+        private static void SetKeyboardLayout(bool toRussian)
+        {
+            IntPtr targetLayout = toRussian ? RussianLayout : EnglishLayout;
+
+            IntPtr hwndForeground = GetForegroundWindow();
+            if (hwndForeground == IntPtr.Zero) return;
+
+            uint foregroundThreadId = GetWindowThreadProcessId(hwndForeground, IntPtr.Zero);
+            if (foregroundThreadId == 0) return;
+
+            IntPtr targetWindow = hwndForeground;
+
+            var info = new GUITHREADINFO();
+            info.cbSize = Marshal.SizeOf(typeof(GUITHREADINFO));
+
+            if (GetGUIThreadInfo(foregroundThreadId, ref info) && info.hwndFocus != IntPtr.Zero)
+            {
+                targetWindow = info.hwndFocus;
+            }
+
+            PostMessage(targetWindow, WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, targetLayout);
         }
 
         private static void RestoreClipboard(string? text)
@@ -194,9 +273,8 @@ namespace wfaLayoutConverter
             else Clipboard.Clear();
         }
 
-        private static string ConvertLayout(string input)
+        private static string ConvertLayout(string input, bool toRussian)
         {
-            bool toRussian = DetectDirection(input);
             var map = toRussian ? EnToRu : RuToEn;
 
             var sb = new StringBuilder(input.Length);
@@ -215,7 +293,7 @@ namespace wfaLayoutConverter
             foreach (char ch in input)
             {
                 char lower = char.ToLower(ch);
-                if (EnToRu.ContainsKey(lower)) return true; 
+                if (EnToRu.ContainsKey(lower)) return true;
                 if (RuToEn.ContainsKey(lower)) return false;
             }
             return true;
