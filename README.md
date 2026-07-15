@@ -4,7 +4,7 @@ Simple Windows tray utility to fix text typed in the wrong keyboard layout.
 
 ## Features
 - Convert selected text (EN ↔ RU)
-- Global hotkey: Ctrl + Alt + V
+- Global hotkey: Alt + Q
 - Runs in system tray
 - Enable / disable toggle
 - Autostart support
@@ -12,7 +12,7 @@ Simple Windows tray utility to fix text typed in the wrong keyboard layout.
 ## Usage
 1. Run the app
 2. Select text
-3. Press Ctrl + Alt + V
+3. Press Alt + Q
 
 ## Example
 ghbdtn → привет  
