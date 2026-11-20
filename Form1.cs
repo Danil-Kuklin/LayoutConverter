@@ -140,8 +140,8 @@ namespace wfaLayoutConverter
             toggleItem.Click += ToggleEnabled;
             trayMenu.Items.Add(toggleItem);
             trayIcon = new NotifyIcon();
-            //trayIcon.Icon = SystemIcons.Application;
-            trayIcon.Icon = new Icon("favicon.ico");
+            trayIcon.Icon = SystemIcons.Application;
+            //trayIcon.Icon = new Icon("favicon.ico");
             trayIcon.Text = "Layout Converter";
             trayIcon.ContextMenuStrip = trayMenu;
             trayIcon.Visible = true;
